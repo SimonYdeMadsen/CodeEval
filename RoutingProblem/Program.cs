@@ -17,7 +17,7 @@ namespace RoutingProblem
             List<List<uint>> listOfHosts = new List<List<uint>>();
             List<Node> vertexSet = new List<Node>();
             using (StreamReader reader = File.OpenText(args[0]))
-                
+
                 while (!reader.EndOfStream)
                 {
                     string line = reader.ReadLine();
@@ -25,7 +25,7 @@ namespace RoutingProblem
                     if (line == null) continue;
                     lineNumber++;
 
-                    
+
                     //operate on the host interfaces
                     if (lineNumber == 1)
                     {
@@ -39,16 +39,16 @@ namespace RoutingProblem
 
                         foreach (string hostMapping in routeMapping)
                         {
-                            
+
                             List<uint> listOfHostInterfaces = new List<uint>();
 
                             Node hostNode = new Node();
 
                             foreach (string networkInterface in hostMapping.Split(','))
                             {
-                                
+
                                 string currentInterface = networkInterface.Split('\'')[1];
-                                
+
 
 
                                 string[] currentCIDR = currentInterface.Split('/');
@@ -73,12 +73,12 @@ namespace RoutingProblem
 
 
                                 hostNode.Data.Add(subnetInterface);
-                                
-                                
+
+
                             }
                             listOfHosts.Add(listOfHostInterfaces);
 
-                            
+
                             vertexSet.Add(hostNode);
 
 
@@ -93,10 +93,17 @@ namespace RoutingProblem
                     } // end line 1
                     else
                     {
-
+                        Console.WriteLine("host 5: ");
                         PrintInterfacesOfHost(listOfHosts, 5);
+                        Console.WriteLine("host 1: ");
                         PrintInterfacesOfHost(listOfHosts, 1);
+                        Console.WriteLine("host 3: ");
+                        PrintInterfacesOfHost(listOfHosts, 3);
+                        Console.WriteLine("host 4: ");
+                        PrintInterfacesOfHost(listOfHosts, 4);
+                        Console.WriteLine("host 8: ");
                         PrintInterfacesOfHost(listOfHosts, 8);
+
 
                         if (line.Length < 5)
                             Console.WriteLine(line);
@@ -109,21 +116,37 @@ namespace RoutingProblem
 
                         //dijkstra's
 
-                        Tuple<int[], List<int>[]> result = Dijkstras(vertexSet, start_ID);
+                        Tuple<int[], List<int>[]> dijkstraLists = Dijkstras(vertexSet, start_ID);
 
-                        var prev = result.Item2;
+                        string result = "" + end_ID;
+                        var prev = dijkstraLists.Item2;
                         int u = end_ID;
 
+                        Console.WriteLine("prev.Count: " + prev.Length);
+                        Console.WriteLine("prev[{0}].Count: {1}", u, prev[u].Count);
 
-                        
+
                         while (prev[u].Count > 0)
                         {
-                            Console.WriteLine("u: "+ u);
                             u = prev[u][0];
-                            
+                            result = u+", "+result;
                         }
 
-                    }
+                        if (! (int.Parse("" + result[0]) == start_ID))
+                        {
+                            Console.WriteLine("No connection.");
+                        }
+                        else
+                        {
+                            Console.WriteLine('[' + result + ']');
+                        }
+
+                        //TO-DO: add support for more than one shortest path (sort them)
+
+
+
+
+                    } // end else
 
 
 
@@ -132,68 +155,102 @@ namespace RoutingProblem
 
 
 
-                } //end else
-                }
+                } //end while
+        }
 
-        private static Tuple<int[],List<int>[]> Dijkstras(List<Node> vertexSet, int source)
+        private static Tuple<int[], List<int>[]> Dijkstras(List<Node> vertexSet, int source)
         {
-            List<Node> Q = new List<Node>();
-
+            int lengthOfQ = vertexSet.Count;
+            Node[] Q = new Node[lengthOfQ];
+            
             int[] dist = new int[vertexSet.Count];
             List<int>[] prev = new List<int>[vertexSet.Count];
             for (int i = 0; i < vertexSet.Count; i++)
             {
-                dist[i] = int.MaxValue;
+                dist[i] = 10000;
                 prev[i] = new List<int>();
-                Q.Add(vertexSet[i]);
+                Q[i] = vertexSet[i];
             }
             dist[source] = 0;
 
-            while (Q.Count != 0)
+            while (lengthOfQ > 0)
             {
-                int minDistance = int.MaxValue;
-                int sourceIndex = 0;
-                List<Node> sourceNeighbors = new List<Node>();
+
+
+                int minDistance = 10000;
+                int sourceIndex = -1;
+                List<int> neighborIndices = new List<int>();
+
+
+                //select a source node
                 for (int i = 0; i < dist.Length; i++)
                 {
-                    //select a source node
-                    try
+                    if (Q[i] != null && dist[i] <= minDistance)
                     {
-                        if (dist[i] < minDistance && Q[i] != null)
-                        {
-                            minDistance = Q[i].Distance;
-                            sourceIndex = i;
-                        }
+                        minDistance = dist[i];
+                        sourceIndex = i;
                     }
-                    catch (ArgumentOutOfRangeException) {}
+                    
+
                 }
+
+
+                Console.WriteLine("minDistance: "+ minDistance);
+                Console.WriteLine("sourceIndex: "+ sourceIndex);
+                Console.WriteLine("length of Q: "+ lengthOfQ);
+                if (sourceIndex == -1)
+                {
+                    throw new IndexOutOfRangeException("Custom: Source index not set.");
+                }
+
 
                 Node currentSource = Q[sourceIndex];
-                Q.RemoveAt(sourceIndex);
-                for (int i = 0; i < Q.Count; i++)
+
+
+                //find neighbors of current source node
+                for (int i = 0; i < Q.Length; i++)
                 {
-                    //find neighbors of source node
+                    if (i == sourceIndex) continue;
+
                     foreach (uint sourceData in currentSource.Data)
-                        if (Q[i].Data.Contains(sourceData)) sourceNeighbors.Add(Q[i]);
-                }
-
-
-
-                for (int i = 0; i < sourceNeighbors.Count; i++)
-                {
-                    int alternativeRoute = minDistance + 1;
-                    if (alternativeRoute < sourceNeighbors[i].Distance)
                     {
-                        //a shorter path has been found
-                        dist[i] = alternativeRoute;
-                        prev[i].Add(sourceIndex);
+                        if (Q[i] != null && Q[i].Data.Contains(sourceData))
+                        {
+                            neighborIndices.Add(i);
+                            Console.WriteLine("neighbor: " + i);
+                            break;
+                        }
                     }
                 }
+
+                //remove source from Q
+                Q[sourceIndex] = null;
+                lengthOfQ--;
+                
+
+                //find alternative paths
+                for (int i = 0; i < neighborIndices.Count; i++)
+                {
+                    int alternativeRoute = minDistance + 1;
+                    if (alternativeRoute < dist[neighborIndices[i]])
+                    {
+                        //a shorter path has been found
+
+                        dist[neighborIndices[i]] = alternativeRoute;
+                        prev[neighborIndices[i]].Add(sourceIndex);
+
+                        Console.WriteLine("updated prev[{0}]",neighborIndices[i]);
+
+                        //Console.WriteLine("altered ({0}, {1}) to distance value {2}", sourceIndex, neighborIndices[i], alternativeRoute);
+
+                    }
+                }
+                Console.WriteLine();
 
                 
 
             }
-            return new Tuple<int[],List<int>[]>(dist, prev);
+            return new Tuple< int[],List<int>[] >(dist, prev);
         }
 
 
